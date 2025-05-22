@@ -1,7 +1,7 @@
 services:
   - type: web
     name: chatbot-api
-    env: docker
+    env: linux
     plan: free
     region: oregon
     buildCommand: "dotnet build"
