@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: chatbot-api
+    env: docker
+    plan: free
+    region: oregon
+    buildCommand: "dotnet build"
+    startCommand: "dotnet run --urls=http://0.0.0.0:10000"
+    envVars:
+      - key: OpenRouter__ApiKey
+        sync: false
+    autoDeploy: true
+    repo: https://github.com/Barosz30/Chatbot
