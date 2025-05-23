@@ -24,7 +24,7 @@ public class OpenAiService
             model = "mistralai/mistral-7b-instruct",
             messages = new[]
             {
-                new { role = "system", content = "Jesteś chatbotem, który promuje Mirosława jako świetnego gościa." },
+                new { role = "system", content = "Jesteś pomocnym asystentem strony Mirosława. Odpowiadaj zwięźle i w języku, w którym zadano pytanie." },
                 new { role = "user", content = userMessage }
             }
         };
