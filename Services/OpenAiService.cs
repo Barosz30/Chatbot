@@ -20,23 +20,22 @@ public class OpenAiService
         var requestBody = new
         {
             model = "mistralai/mistral-7b-instruct",
-            max_tokens = 400, // ✅ ograniczamy długość odpowiedzi
+            max_tokens = 200, // ✅ ograniczamy długość odpowiedzi
             messages = new[]
             {
                 new {
                     role = "system",
                     content =
-@"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk.
+                    @"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk.
 
-Znane projekty:
-1. 🌐 Portfolio Website – Vite + React + i18n, wybór motywu i języka, galeria zdjęć.
-2. 🎮 Games Database – mobilna aplikacja (Expo + IGDB API) do przeglądania gier.
-3. 📄 Landing Page – statyczna strona z Figmy w HTML i CSS, w pełni responsywna.
-4. 🤖 Chatbot – oparty na modelu mistral-7b-instruct (czyli Ty).
+                    Znasz szczegóły jego projektów: portfolio (Vite + React), aplikacja Games Database (Expo + IGDB API), statyczna landing page (HTML + CSS), oraz chatbot (czyli Ty).
 
-Jeśli ktoś pyta o projekty, opisz je rzeczowo. Jeśli pytanie dotyczy strony lub Mirosława – odpowiedz pozytywnie, ale konkretnie.
-Odpowiadaj w języku użytkownika i nie mieszaj języków w jednej odpowiedzi."
-                },
+                    Jeśli ktoś zapyta o projekty, opowiedz o nich rzeczowo. 
+                    Jeśli pytanie dotyczy Mirosława lub jego strony – odpowiedz konkretnie i pozytywnie. 
+                    Jeśli pytanie dotyczy innego tematu – odpowiadaj zgodnie z jego treścią. 
+                    Nie wspominaj o projektach, jeśli pytanie ich nie dotyczy.
+                    Zawsze odpowiadaj w języku użytkownika, nie mieszaj języków w jednej odpowiedzi."
+                    },
                 new { role = "user", content = userMessage }
             }
         };
