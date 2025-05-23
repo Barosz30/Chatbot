@@ -17,11 +17,10 @@ public class OpenAiService
 
     public async Task<string> Ask(string userMessage)
     {
-        // Spróbuj najpierw z GPT-3.5
         var models = new[]
         {
             "openai/gpt-3.5-turbo",
-            "mistralai/mistral-7b-instruct" // fallback
+            "mistralai/mistral-7b-instruct"
         };
 
         foreach (var model in models)
@@ -39,7 +38,7 @@ public class OpenAiService
                             content =
 @"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk.
 
-Znasz jego projekty (portfolio React, aplikacja mobilna IGDB, landing page HTML, chatbot).
+Znasz jego projekty (portfolio React, aplikacja mobilna React Native połączona z IGDB, landing page HTML odtwarzająca figmę, chatbot).
 
 Jeśli ktoś zapyta o nie – opisz je krótko. 
 Jeśli pytanie dotyczy czegoś innego – odpowiedz zgodnie z tematem.
