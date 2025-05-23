@@ -17,48 +17,71 @@ public class OpenAiService
 
     public async Task<string> Ask(string userMessage)
     {
-        var requestBody = new
+        // Spróbuj najpierw z GPT-3.5
+        var models = new[]
         {
-            model = "mistralai/mistral-7b-instruct",
-            max_tokens = 400,
-            messages = new[]
-            {
-                new {
-                    role = "system",
-                    content =
-                    @"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk.
+            "openai/gpt-3.5-turbo",
+            "mistralai/mistral-7b-instruct" // fallback
+        };
 
-                    Zawsze odpowiadaj w języku użytkownika, nie mieszaj języków w jednej odpowiedzi.
-                    
-                    Jeśli odpowiadasz po polsku, pisz pełnymi zdaniami, z naturalnym szykiem języka polskiego. Unikaj kalk językowych.
-"
+        foreach (var model in models)
+        {
+            try
+            {
+                var requestBody = new
+                {
+                    model,
+                    max_tokens = 300,
+                    messages = new[]
+                    {
+                        new {
+                            role = "system",
+                            content =
+@"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk.
+
+Znasz jego projekty (portfolio React, aplikacja mobilna IGDB, landing page HTML, chatbot).
+
+Jeśli ktoś zapyta o nie – opisz je krótko. 
+Jeśli pytanie dotyczy czegoś innego – odpowiedz zgodnie z tematem.
+Odpowiadaj w języku użytkownika. Nie mieszaj języków w jednej odpowiedzi."
+                        },
+                        new { role = "user", content = userMessage }
+                    }
+                };
+
+                var json = JsonSerializer.Serialize(requestBody);
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
+                {
+                    Headers =
+                    {
+                        { "Authorization", $"Bearer {_apiKey}" },
+                        { "HTTP-Referer", "https://portfolio.mirowandyk.pl" },
+                        { "X-Title", "MirekChatbot" }
                     },
-                new { role = "user", content = userMessage }
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+
+                var response = await _httpClient.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+
+                var reply = doc.RootElement
+                    .GetProperty("choices")[0]
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString();
+
+                return reply ?? "Brak odpowiedzi.";
             }
-        };
-
-        var json = JsonSerializer.Serialize(requestBody);
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
-        {
-            Headers =
+            catch (Exception ex)
             {
-                { "Authorization", $"Bearer {_apiKey}" },
-                { "HTTP-Referer", "https://portfolio.mirowandyk.pl" }, // użyj faktycznego adresu produkcyjnego
-                { "X-Title", "MirekChatbot" }
-            },
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
+                Console.WriteLine($"Błąd dla modelu {model}: {ex.Message}");
+                // Jeśli to nie ostatni model, próbuj dalej
+            }
+        }
 
-        var response = await _httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode(); // zgłosi wyjątek przy 4xx/5xx
-
-        var content = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(content);
-
-        return doc.RootElement
-                  .GetProperty("choices")[0]
-                  .GetProperty("message")
-                  .GetProperty("content")
-                  .GetString() ?? "Brak odpowiedzi.";
+        return "Wystąpił problem z połączeniem z chatbotem.";
     }
 }
