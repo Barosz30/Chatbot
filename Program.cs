@@ -1,21 +1,30 @@
 var builder = WebApplication.CreateBuilder(args);
 
-// Rejestracja kontrolerów
 builder.Services.AddControllers();
 
-// Swagger i dokumentacja
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Konfiguracja środowiska
 builder.Configuration.AddEnvironmentVariables();
 
-// Rejestracja serwisu (używającego OpenRouter)
-builder.Services.AddHttpClient<OpenAiService>(); // możesz zmienić nazwę na OpenRouterService, jeśli chcesz
+builder.Services.AddHttpClient<OpenAiService>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy
+            .WithOrigins(
+                "https://barosz30.github.io",
+                "http://localhost:5173"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
-// Ustawienia tylko dla trybu developerskiego
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -23,12 +32,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors();
 app.UseAuthorization();
 
-// Rejestracja kontrolerów (np. ChatController)
 app.MapControllers();
 
-// (opcjonalnie) Zostawiamy endpoint pogodowy, jeśli chcesz
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild",
