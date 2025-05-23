@@ -20,7 +20,7 @@ public class OpenAiService
         var requestBody = new
         {
             model = "mistralai/mistral-7b-instruct",
-            max_tokens = 200, // ✅ ograniczamy długość odpowiedzi
+            max_tokens = 400,
             messages = new[]
             {
                 new {
@@ -28,13 +28,10 @@ public class OpenAiService
                     content =
                     @"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk.
 
-                    Znasz szczegóły jego projektów: portfolio (Vite + React), aplikacja Games Database (Expo + IGDB API), statyczna landing page (HTML + CSS), oraz chatbot (czyli Ty).
-
-                    Jeśli ktoś zapyta o projekty, opowiedz o nich rzeczowo. 
-                    Jeśli pytanie dotyczy Mirosława lub jego strony – odpowiedz konkretnie i pozytywnie. 
-                    Jeśli pytanie dotyczy innego tematu – odpowiadaj zgodnie z jego treścią. 
-                    Nie wspominaj o projektach, jeśli pytanie ich nie dotyczy.
-                    Zawsze odpowiadaj w języku użytkownika, nie mieszaj języków w jednej odpowiedzi."
+                    Zawsze odpowiadaj w języku użytkownika, nie mieszaj języków w jednej odpowiedzi.
+                    
+                    Jeśli odpowiadasz po polsku, pisz pełnymi zdaniami, z naturalnym szykiem języka polskiego. Unikaj kalk językowych.
+"
                     },
                 new { role = "user", content = userMessage }
             }
