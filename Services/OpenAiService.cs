@@ -6,15 +6,13 @@ using Microsoft.Extensions.Configuration;
 public class OpenAiService
 {
     private readonly HttpClient _httpClient;
-    private readonly string? _apiKey;
+    private readonly string _apiKey;
 
     public OpenAiService(HttpClient httpClient, IConfiguration config)
     {
         _httpClient = httpClient;
-        _apiKey = config["OpenRouter:ApiKey"];
-
-        if (string.IsNullOrWhiteSpace(_apiKey))
-            throw new ArgumentNullException(nameof(_apiKey), "Brak klucza OpenRouter w konfiguracji.");
+        _apiKey = config["OpenRouter:ApiKey"]
+                  ?? throw new ArgumentNullException(nameof(_apiKey), "Brak klucza OpenRouter w konfiguracji.");
     }
 
     public async Task<string> Ask(string userMessage)
@@ -22,41 +20,49 @@ public class OpenAiService
         var requestBody = new
         {
             model = "mistralai/mistral-7b-instruct",
+            max_tokens = 400, // ✅ ograniczamy długość odpowiedzi
             messages = new[]
             {
-                new { role = "system", content =
-                @"Jesteś inteligentnym asystentem strony Mirosława Wandyk.
+                new {
+                    role = "system",
+                    content =
+@"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk.
 
-                Projekty przedstawione na stronie:
-                1. 🌐 Portfolio Website - strona z i18n, Vite + React, wyborem motywu, języka i galerią zdjęć.
-                2. 🎮 Games Database - aplikacja mobilna do przeglądania gier (Expo + IGDB API).
-                3. Landing Page - otworzony projekt z figmy za pomocą html i css. W pełni responsywny.
-                4. Chatbot, wykorzystujący model mistralai/mistral-7b-instruct, czyli ty.
+Znane projekty:
+1. 🌐 Portfolio Website – Vite + React + i18n, wybór motywu i języka, galeria zdjęć.
+2. 🎮 Games Database – mobilna aplikacja (Expo + IGDB API) do przeglądania gier.
+3. 📄 Landing Page – statyczna strona z Figmy w HTML i CSS, w pełni responsywna.
+4. 🤖 Chatbot – oparty na modelu mistral-7b-instruct (czyli Ty).
 
-                Jeśli ktoś pyta o projekty, opowiedz o nich. Jeśli pytanie dotyczy strony lub Mirosława, odpowiadaj rzeczowo i pozytywnie. 
-                Używaj języka, w którym zadano pytanie." },
+Jeśli ktoś pyta o projekty, opisz je rzeczowo. Jeśli pytanie dotyczy strony lub Mirosława – odpowiedz pozytywnie, ale konkretnie.
+Odpowiadaj w języku użytkownika i nie mieszaj języków w jednej odpowiedzi."
+                },
                 new { role = "user", content = userMessage }
             }
         };
 
         var json = JsonSerializer.Serialize(requestBody);
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions");
-        request.Headers.Add("Authorization", $"Bearer {_apiKey}");
-        request.Headers.Add("HTTP-Referer", "http://localhost");
-        request.Headers.Add("X-Title", "MirekChatbot");
-
-        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
+        {
+            Headers =
+            {
+                { "Authorization", $"Bearer {_apiKey}" },
+                { "HTTP-Referer", "https://portfolio.mirowandyk.pl" }, // użyj faktycznego adresu produkcyjnego
+                { "X-Title", "MirekChatbot" }
+            },
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
 
         var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode(); // zgłosi wyjątek przy 4xx/5xx
+
         var content = await response.Content.ReadAsStringAsync();
-
         using var doc = JsonDocument.Parse(content);
-        var reply = doc.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString();
 
-        return reply ?? "Brak odpowiedzi.";
+        return doc.RootElement
+                  .GetProperty("choices")[0]
+                  .GetProperty("message")
+                  .GetProperty("content")
+                  .GetString() ?? "Brak odpowiedzi.";
     }
 }
