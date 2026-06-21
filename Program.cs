@@ -75,6 +75,22 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+var groqKeyConfigured = !string.IsNullOrWhiteSpace(app.Configuration["Groq:ApiKey"]);
+var openRouterKeyConfigured = !string.IsNullOrWhiteSpace(app.Configuration["OpenRouter:ApiKey"]);
+
+if (!groqKeyConfigured && !openRouterKeyConfigured)
+{
+    app.Logger.LogWarning(
+        "Brak kluczy LLM. Ustaw Groq__ApiKey lub OpenRouter__ApiKey w Render Environment.");
+}
+else
+{
+    app.Logger.LogInformation(
+        "LLM providers: Groq={GroqConfigured}, OpenRouter={OpenRouterConfigured}",
+        groqKeyConfigured,
+        openRouterKeyConfigured);
+}
+
 app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())
