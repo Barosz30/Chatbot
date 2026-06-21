@@ -11,6 +11,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Configuration.AddEnvironmentVariables();
 
+builder.Services.AddSingleton<ChatKnowledgeService>();
 builder.Services.AddHttpClient<OpenAiService>();
 
 // The app runs behind Render's reverse proxy, so the real client IP arrives in
