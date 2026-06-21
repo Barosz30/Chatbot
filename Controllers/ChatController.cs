@@ -16,6 +16,13 @@ public class ChatController : ControllerBase
         _openAi = openAi;
     }
 
+    [HttpGet("ping")]
+    [DisableRateLimiting]
+    public IActionResult Ping()
+    {
+        return NoContent();
+    }
+
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] ChatRequest request)
     {

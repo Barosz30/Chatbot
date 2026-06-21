@@ -1,5 +1,19 @@
 @ChatbotApi_HostAddress = http://localhost:5109
 
+# Wake the Render instance on page load (no OpenRouter call).
+GET {{ChatbotApi_HostAddress}}/api/chat/ping
+
+###
+
+POST {{ChatbotApi_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "Cześć!"
+}
+
+###
+
 GET {{ChatbotApi_HostAddress}}/weatherforecast/
 Accept: application/json
 
