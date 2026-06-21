@@ -5,23 +5,36 @@ using Microsoft.Extensions.Configuration;
 
 public class OpenAiService
 {
+    // Free-only model chain so the chatbot never incurs OpenRouter charges.
+    // "openrouter/free" auto-selects an available free model (the free roster
+    // rotates), with explicit :free fallbacks for resilience.
+    private static readonly string[] DefaultModels =
+    {
+        "openrouter/free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "meta-llama/llama-3.2-3b-instruct:free"
+    };
+
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
+    private readonly string[] _models;
+    private readonly int _maxTokens;
 
     public OpenAiService(HttpClient httpClient, IConfiguration config)
     {
         _httpClient = httpClient;
+        _httpClient.Timeout = TimeSpan.FromSeconds(30);
         _apiKey = config["OpenRouter:ApiKey"]
                   ?? throw new ArgumentNullException(nameof(_apiKey), "Brak klucza OpenRouter w konfiguracji.");
+
+        var configuredModels = config.GetSection("OpenRouter:Models").Get<string[]>();
+        _models = configuredModels is { Length: > 0 } ? configuredModels : DefaultModels;
+        _maxTokens = config.GetValue<int?>("OpenRouter:MaxTokens") ?? 300;
     }
 
     public async Task<string> Ask(string userMessage)
     {
-        var models = new[]
-        {
-            "openai/gpt-3.5-turbo",
-            "mistralai/mistral-7b-instruct"
-        };
+        var models = _models;
 
         foreach (var model in models)
         {
@@ -30,7 +43,7 @@ public class OpenAiService
                 var requestBody = new
                 {
                     model,
-                    max_tokens = 300,
+                    max_tokens = _maxTokens,
                     messages = new[]
                     {
                         new {

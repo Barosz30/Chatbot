@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
@@ -8,6 +12,50 @@ builder.Services.AddSwaggerGen();
 builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddHttpClient<OpenAiService>();
+
+// The app runs behind Render's reverse proxy, so the real client IP arrives in
+// the X-Forwarded-For header. Honour it so rate limiting partitions per client.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Per-IP rate limiting protects the (paid) upstream model from abuse and runaway
+// cost, since the public /api/chat endpoint has no authentication.
+var permitLimit = builder.Configuration.GetValue<int?>("RateLimiting:PermitLimit") ?? 10;
+var windowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:WindowSeconds") ?? 60;
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("chat", httpContext =>
+    {
+        var clientKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(clientKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = TimeSpan.FromSeconds(windowSeconds),
+            QueueLimit = 0
+        });
+    });
+
+    options.OnRejected = async (context, token) =>
+    {
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+        }
+
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsync(
+            "{\"reply\":\"Za dużo zapytań. Spróbuj ponownie za chwilę.\"}", token);
+    };
+});
 
 builder.Services.AddCors(options =>
 {
@@ -25,6 +73,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -33,6 +83,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

@@ -1,4 +1,23 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / Rider / VS Code local state
+.vs/
+.idea/
+*.user
+*.suo
+
+# Secrets / local configuration (never commit these)
 appsettings.Development.json
+appsettings.*.Local.json
+*.env
+.env
+secrets.json
+
+# Helper scripts
 temp_auto_push.bat
 temp_interactive_push.bat
-.gitignore
