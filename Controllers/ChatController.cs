@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -8,6 +7,14 @@ using Microsoft.AspNetCore.RateLimiting;
 public class ChatController : ControllerBase
 {
     private const int MaxMessageLength = 2000;
+    private const int MaxHistoryMessages = 20;
+
+    private static readonly ChatWelcomeResponse WelcomeMessage = new()
+    {
+        Message =
+            "Cześć! Jestem asystentem Mirosława Wandyk. " +
+            "Zapytaj o jego projekty, umiejętności, doświadczenie albo dlaczego warto z nim współpracować."
+    };
 
     private readonly OpenAiService _openAi;
 
@@ -21,6 +28,13 @@ public class ChatController : ControllerBase
     public IActionResult Ping()
     {
         return NoContent();
+    }
+
+    [HttpGet("welcome")]
+    [DisableRateLimiting]
+    public IActionResult Welcome()
+    {
+        return Ok(WelcomeMessage);
     }
 
     [HttpPost]
@@ -37,14 +51,12 @@ public class ChatController : ControllerBase
             return BadRequest(new { reply = $"Wiadomość jest za długa (maks. {MaxMessageLength} znaków)." });
         }
 
-        var reply = await _openAi.Ask(message);
+        if (request.History is { Count: > MaxHistoryMessages })
+        {
+            return BadRequest(new { reply = $"Historia rozmowy jest za długa (maks. {MaxHistoryMessages} wiadomości)." });
+        }
+
+        var reply = await _openAi.Ask(message, request.History);
         return Ok(new { reply });
     }
-}
-
-public class ChatRequest
-{
-    [Required]
-    [StringLength(2000, MinimumLength = 1)]
-    public string Message { get; set; } = string.Empty;
 }

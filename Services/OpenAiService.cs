@@ -5,97 +5,139 @@ using Microsoft.Extensions.Configuration;
 
 public class OpenAiService
 {
-    // Free-only model chain so the chatbot never incurs OpenRouter charges.
-    // "openrouter/free" auto-selects an available free model (the free roster
-    // rotates), with explicit :free fallbacks for resilience.
+    // Pinned chat models only — avoid openrouter/free, which can route to moderation models.
     private static readonly string[] DefaultModels =
     {
-        "openrouter/free",
         "meta-llama/llama-3.3-70b-instruct:free",
         "meta-llama/llama-3.2-3b-instruct:free"
     };
 
+    private const int MaxHistoryMessages = 20;
+
     private readonly HttpClient _httpClient;
+    private readonly ChatKnowledgeService _knowledge;
     private readonly string _apiKey;
     private readonly string[] _models;
     private readonly int _maxTokens;
 
-    public OpenAiService(HttpClient httpClient, IConfiguration config)
+    public OpenAiService(HttpClient httpClient, IConfiguration config, ChatKnowledgeService knowledge)
     {
         _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
+        _knowledge = knowledge;
         _apiKey = config["OpenRouter:ApiKey"]
                   ?? throw new ArgumentNullException(nameof(_apiKey), "Brak klucza OpenRouter w konfiguracji.");
 
         var configuredModels = config.GetSection("OpenRouter:Models").Get<string[]>();
         _models = configuredModels is { Length: > 0 } ? configuredModels : DefaultModels;
-        _maxTokens = config.GetValue<int?>("OpenRouter:MaxTokens") ?? 300;
+        _maxTokens = config.GetValue<int?>("OpenRouter:MaxTokens") ?? 600;
     }
 
-    public async Task<string> Ask(string userMessage)
+    public async Task<string> Ask(string userMessage, IReadOnlyList<ChatHistoryMessage>? history)
     {
-        var models = _models;
+        var messages = BuildMessages(userMessage, history);
 
-        foreach (var model in models)
+        foreach (var model in _models)
         {
             try
             {
-                var requestBody = new
+                var reply = await SendCompletionRequest(model, messages);
+                if (IsUsableReply(reply))
                 {
-                    model,
-                    max_tokens = _maxTokens,
-                    messages = new[]
-                    {
-                        new {
-                            role = "system",
-                            content =
-@"Jesteś inteligentnym, pomocnym chatbotem na stronie Mirosława Wandyk. Chwal go, kiedy jest na to czas.
+                    return reply!;
+                }
 
-Znasz jego projekty (portfolio React, aplikacja mobilna React Native połączona z IGDB, landing page HTML odtwarzająca figmę, chatbot).
-
-Jeśli ktoś zapyta o nie – opisz je krótko. 
-Jeśli pytanie dotyczy czegoś innego – odpowiedz zgodnie z tematem.
-Odpowiadaj w języku użytkownika. Nie mieszaj języków w jednej odpowiedzi.
-
-Działasz na darmowym planie Render — po bezczynności serwer „zasypia”, więc pierwsza odpowiedź po przerwie może chwilę potrwać. Jeśli użytkownik pyta o opóźnienie lub to jego pierwsze pytanie, wspomnij że jesteś trochę śpiący i musisz się obudzić."
-                        },
-                        new { role = "user", content = userMessage }
-                    }
-                };
-
-                var json = JsonSerializer.Serialize(requestBody);
-                var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
-                {
-                    Headers =
-                    {
-                        { "Authorization", $"Bearer {_apiKey}" },
-                        { "HTTP-Referer", "https://portfolio.mirowandyk.pl" },
-                        { "X-Title", "MirekChatbot" }
-                    },
-                    Content = new StringContent(json, Encoding.UTF8, "application/json")
-                };
-
-                var response = await _httpClient.SendAsync(request);
-                response.EnsureSuccessStatusCode();
-
-                var content = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(content);
-
-                var reply = doc.RootElement
-                    .GetProperty("choices")[0]
-                    .GetProperty("message")
-                    .GetProperty("content")
-                    .GetString();
-
-                return reply ?? "Brak odpowiedzi.";
+                Console.WriteLine($"Odrzucono odpowiedź modelu {model}: {reply}");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Błąd dla modelu {model}: {ex.Message}");
-                // Jeśli to nie ostatni model, próbuj dalej
             }
         }
 
-        return "Wystąpił problem z połączeniem z chatbotem.";
+        return "Przepraszam, nie udało mi się teraz wygenerować odpowiedzi. Spróbuj ponownie za chwilę.";
+    }
+
+    private object[] BuildMessages(string userMessage, IReadOnlyList<ChatHistoryMessage>? history)
+    {
+        var messages = new List<object>
+        {
+            new { role = "system", content = _knowledge.BuildSystemPrompt() }
+        };
+
+        if (history is { Count: > 0 })
+        {
+            var recentHistory = history
+                .TakeLast(MaxHistoryMessages)
+                .Where(message => message.Role is "user" or "assistant")
+                .Where(message => !string.IsNullOrWhiteSpace(message.Content));
+
+            foreach (var message in recentHistory)
+            {
+                messages.Add(new { role = message.Role, content = message.Content.Trim() });
+            }
+        }
+
+        messages.Add(new { role = "user", content = userMessage });
+        return messages.ToArray();
+    }
+
+    private async Task<string?> SendCompletionRequest(string model, object[] messages)
+    {
+        var requestBody = new
+        {
+            model,
+            max_tokens = _maxTokens,
+            temperature = 0.4,
+            messages
+        };
+
+        var json = JsonSerializer.Serialize(requestBody);
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
+        {
+            Headers =
+            {
+                { "Authorization", $"Bearer {_apiKey}" },
+                { "HTTP-Referer", "https://portfolio.mirowandyk.pl" },
+                { "X-Title", "MirekChatbot" }
+            },
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(content);
+
+        return doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString();
+    }
+
+    private static bool IsUsableReply(string? reply)
+    {
+        if (string.IsNullOrWhiteSpace(reply))
+        {
+            return false;
+        }
+
+        var trimmed = reply.Trim();
+
+        if (trimmed.Contains("User Safety", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Contains("Response Safety", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (trimmed.StartsWith('{') && trimmed.EndsWith('}') &&
+            trimmed.Contains("safe", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -5,11 +5,35 @@ GET {{ChatbotApi_HostAddress}}/api/chat/ping
 
 ###
 
+# Static welcome message for the chat UI (no OpenRouter call).
+GET {{ChatbotApi_HostAddress}}/api/chat/welcome
+
+###
+
 POST {{ChatbotApi_HostAddress}}/api/chat
 Content-Type: application/json
 
 {
-  "message": "Cześć!"
+  "message": "Kim jest Mirosław?"
+}
+
+###
+
+POST {{ChatbotApi_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "Jakie projekty ma w portfolio?",
+  "history": [
+    {
+      "role": "user",
+      "content": "Kim jest Mirosław?"
+    },
+    {
+      "role": "assistant",
+      "content": "Mirosław Wandyk to Full-Stack Engineer z około 2 latami komercyjnego doświadczenia..."
+    }
+  ]
 }
 
 ###
