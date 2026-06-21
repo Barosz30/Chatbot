@@ -64,6 +64,7 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "https://barosz30.github.io",
+                "https://portfolio.mirowandyk.pl",
                 "http://localhost:5173"
             )
             .AllowAnyHeader()

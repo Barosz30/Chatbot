@@ -16,11 +16,11 @@ public class ChatController : ControllerBase
         _openAi = openAi;
     }
 
-    [HttpGet("welcome")]
+    [HttpGet("ping")]
     [DisableRateLimiting]
-    public IActionResult GetWelcome()
+    public IActionResult Ping()
     {
-        return Ok(new { message = ChatWelcome.Message });
+        return NoContent();
     }
 
     [HttpPost]
