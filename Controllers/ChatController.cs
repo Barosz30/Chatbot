@@ -9,11 +9,18 @@ public class ChatController : ControllerBase
     private const int MaxMessageLength = 2000;
     private const int MaxHistoryMessages = 20;
 
-    private static readonly ChatWelcomeResponse WelcomeMessage = new()
+    private static readonly ChatWelcomeResponse PolishWelcome = new()
     {
         Message =
             "Cześć! Jestem asystentem Mirosława Wandyk. " +
             "Zapytaj o jego projekty, umiejętności, doświadczenie albo dlaczego warto z nim współpracować."
+    };
+
+    private static readonly ChatWelcomeResponse EnglishWelcome = new()
+    {
+        Message =
+            "Hi! I'm Mirosław Wandyk's assistant. " +
+            "Ask about his projects, skills, experience, or why he's worth working with."
     };
 
     private readonly OpenAiService _openAi;
@@ -32,9 +39,13 @@ public class ChatController : ControllerBase
 
     [HttpGet("welcome")]
     [DisableRateLimiting]
-    public IActionResult Welcome()
+    public IActionResult Welcome([FromQuery] string? lang)
     {
-        return Ok(WelcomeMessage);
+        var welcome = lang?.StartsWith("en", StringComparison.OrdinalIgnoreCase) == true
+            ? EnglishWelcome
+            : PolishWelcome;
+
+        return Ok(welcome);
     }
 
     [HttpPost]
