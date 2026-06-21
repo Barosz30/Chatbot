@@ -5,13 +5,14 @@ using Microsoft.Extensions.Configuration;
 
 public class OpenAiService
 {
-    // A modern paid model as primary (far better chat quality than gpt-3.5-turbo),
-    // with cheaper/free fallbacks for resilience if the primary is unavailable.
+    // Free-only model chain so the chatbot never incurs OpenRouter charges.
+    // "openrouter/free" auto-selects an available free model (the free roster
+    // rotates), with explicit :free fallbacks for resilience.
     private static readonly string[] DefaultModels =
     {
-        "openai/gpt-4o-mini",
-        "openai/gpt-4.1-mini",
-        "meta-llama/llama-3.3-70b-instruct:free"
+        "openrouter/free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "meta-llama/llama-3.2-3b-instruct:free"
     };
 
     private readonly HttpClient _httpClient;
