@@ -5,6 +5,11 @@ GET {{ChatbotApi_HostAddress}}/api/chat/ping
 
 ###
 
+# Provider configuration check (no LLM call, no secrets exposed).
+GET {{ChatbotApi_HostAddress}}/api/chat/status
+
+###
+
 # Static welcome message for the chat UI (no LLM call).
 GET {{ChatbotApi_HostAddress}}/api/chat/welcome?lang=pl
 

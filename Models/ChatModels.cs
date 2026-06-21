@@ -24,3 +24,16 @@ public class ChatWelcomeResponse
 {
     public string Message { get; set; } = string.Empty;
 }
+
+public class ChatStatusResponse
+{
+    public bool GroqKeyConfigured { get; set; }
+
+    public bool OpenRouterKeyConfigured { get; set; }
+
+    public string[] Providers { get; set; } = Array.Empty<string>();
+
+    public string[] GroqModels { get; set; } = Array.Empty<string>();
+
+    public string[] OpenRouterModels { get; set; } = Array.Empty<string>();
+}

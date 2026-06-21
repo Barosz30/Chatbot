@@ -46,7 +46,7 @@ public class OpenAiService
                 try
                 {
                     var reply = await SendCompletionRequest(provider, model, messages);
-                    if (IsUsableReply(reply))
+                    if (reply is not null && IsUsableReply(reply))
                     {
                         return reply!;
                     }
@@ -67,7 +67,7 @@ public class OpenAiService
     {
         var providers = new List<ChatCompletionProvider>();
 
-        var groqApiKey = config["Groq:ApiKey"];
+        var groqApiKey = config["Groq:ApiKey"]?.Trim();
         var groqModels = config.GetSection("Groq:Models").Get<string[]>();
         if (!string.IsNullOrWhiteSpace(groqApiKey))
         {
@@ -79,7 +79,7 @@ public class OpenAiService
                 null));
         }
 
-        var openRouterApiKey = config["OpenRouter:ApiKey"];
+        var openRouterApiKey = config["OpenRouter:ApiKey"]?.Trim();
         if (string.IsNullOrWhiteSpace(openRouterApiKey))
         {
             if (providers.Count == 0)
@@ -160,16 +160,39 @@ public class OpenAiService
         }
 
         var response = await _httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
-
         var content = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(content);
 
-        return doc.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString();
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine(
+                $"HTTP {(int)response.StatusCode} ({provider.Name}/{model}): {TruncateForLog(content)}");
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(content);
+        var choice = doc.RootElement.GetProperty("choices")[0];
+        var message = choice.GetProperty("message");
+
+        if (message.TryGetProperty("content", out var contentElement))
+        {
+            return contentElement.GetString();
+        }
+
+        Console.WriteLine($"Brak pola content ({provider.Name}/{model}): {TruncateForLog(content)}");
+        return null;
+    }
+
+    private static string TruncateForLog(string value, int maxLength = 400)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return "(empty)";
+        }
+
+        var normalized = value.Replace('\n', ' ').Replace('\r', ' ');
+        return normalized.Length <= maxLength
+            ? normalized
+            : normalized[..maxLength] + "...";
     }
 
     private static bool IsUsableReply(string? reply)
