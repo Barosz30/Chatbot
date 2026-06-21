@@ -7,6 +7,8 @@ services:
     buildCommand: "dotnet build"
     startCommand: "dotnet run --urls=http://0.0.0.0:10000"
     envVars:
+      - key: Groq__ApiKey
+        sync: false
       - key: OpenRouter__ApiKey
         sync: false
     autoDeploy: true

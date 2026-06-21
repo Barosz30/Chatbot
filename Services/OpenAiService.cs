@@ -5,19 +5,25 @@ using Microsoft.Extensions.Configuration;
 
 public class OpenAiService
 {
-    // Pinned chat models only — avoid openrouter/free, which can route to moderation models.
-    private static readonly string[] DefaultModels =
+    private static readonly string[] DefaultOpenRouterModels =
     {
+        "qwen/qwen3-next-80b-a3b-instruct:free",
         "meta-llama/llama-3.3-70b-instruct:free",
-        "meta-llama/llama-3.2-3b-instruct:free"
+        "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+        "openai/gpt-oss-20b:free"
+    };
+
+    private static readonly string[] DefaultGroqModels =
+    {
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant"
     };
 
     private const int MaxHistoryMessages = 20;
 
     private readonly HttpClient _httpClient;
     private readonly ChatKnowledgeService _knowledge;
-    private readonly string _apiKey;
-    private readonly string[] _models;
+    private readonly IReadOnlyList<ChatCompletionProvider> _providers;
     private readonly int _maxTokens;
 
     public OpenAiService(HttpClient httpClient, IConfiguration config, ChatKnowledgeService knowledge)
@@ -25,37 +31,80 @@ public class OpenAiService
         _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
         _knowledge = knowledge;
-        _apiKey = config["OpenRouter:ApiKey"]
-                  ?? throw new ArgumentNullException(nameof(_apiKey), "Brak klucza OpenRouter w konfiguracji.");
-
-        var configuredModels = config.GetSection("OpenRouter:Models").Get<string[]>();
-        _models = configuredModels is { Length: > 0 } ? configuredModels : DefaultModels;
         _maxTokens = config.GetValue<int?>("OpenRouter:MaxTokens") ?? 600;
+        _providers = BuildProviders(config);
     }
 
     public async Task<string> Ask(string userMessage, IReadOnlyList<ChatHistoryMessage>? history)
     {
         var messages = BuildMessages(userMessage, history);
 
-        foreach (var model in _models)
+        foreach (var provider in _providers)
         {
-            try
+            foreach (var model in provider.Models)
             {
-                var reply = await SendCompletionRequest(model, messages);
-                if (IsUsableReply(reply))
+                try
                 {
-                    return reply!;
-                }
+                    var reply = await SendCompletionRequest(provider, model, messages);
+                    if (IsUsableReply(reply))
+                    {
+                        return reply!;
+                    }
 
-                Console.WriteLine($"Odrzucono odpowiedź modelu {model}: {reply}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Błąd dla modelu {model}: {ex.Message}");
+                    Console.WriteLine($"Odrzucono odpowiedź ({provider.Name}/{model}): {reply}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Błąd ({provider.Name}/{model}): {ex.Message}");
+                }
             }
         }
 
         return "Przepraszam, nie udało mi się teraz wygenerować odpowiedzi. Spróbuj ponownie za chwilę.";
+    }
+
+    private static IReadOnlyList<ChatCompletionProvider> BuildProviders(IConfiguration config)
+    {
+        var providers = new List<ChatCompletionProvider>();
+
+        var groqApiKey = config["Groq:ApiKey"];
+        var groqModels = config.GetSection("Groq:Models").Get<string[]>();
+        if (!string.IsNullOrWhiteSpace(groqApiKey))
+        {
+            providers.Add(new ChatCompletionProvider(
+                "Groq",
+                "https://api.groq.com/openai/v1/chat/completions",
+                groqApiKey,
+                groqModels is { Length: > 0 } ? groqModels : DefaultGroqModels,
+                null));
+        }
+
+        var openRouterApiKey = config["OpenRouter:ApiKey"];
+        if (string.IsNullOrWhiteSpace(openRouterApiKey))
+        {
+            if (providers.Count == 0)
+            {
+                throw new ArgumentNullException(
+                    nameof(openRouterApiKey),
+                    "Brak klucza OpenRouter w konfiguracji.");
+            }
+        }
+        else
+        {
+            var openRouterModels = config.GetSection("OpenRouter:Models").Get<string[]>();
+            providers.Add(new ChatCompletionProvider(
+                "OpenRouter",
+                "https://openrouter.ai/api/v1/chat/completions",
+                openRouterApiKey,
+                openRouterModels is { Length: > 0 } ? openRouterModels : DefaultOpenRouterModels,
+                new Dictionary<string, string>
+                {
+                    ["HTTP-Referer"] = "https://portfolio.mirowandyk.pl",
+                    ["X-Title"] = "MirekChatbot"
+                }));
+        }
+
+        return providers;
     }
 
     private object[] BuildMessages(string userMessage, IReadOnlyList<ChatHistoryMessage>? history)
@@ -82,7 +131,10 @@ public class OpenAiService
         return messages.ToArray();
     }
 
-    private async Task<string?> SendCompletionRequest(string model, object[] messages)
+    private async Task<string?> SendCompletionRequest(
+        ChatCompletionProvider provider,
+        string model,
+        object[] messages)
     {
         var requestBody = new
         {
@@ -93,16 +145,19 @@ public class OpenAiService
         };
 
         var json = JsonSerializer.Serialize(requestBody);
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions")
+        var request = new HttpRequestMessage(HttpMethod.Post, provider.EndpointUrl)
         {
-            Headers =
-            {
-                { "Authorization", $"Bearer {_apiKey}" },
-                { "HTTP-Referer", "https://portfolio.mirowandyk.pl" },
-                { "X-Title", "MirekChatbot" }
-            },
+            Headers = { { "Authorization", $"Bearer {provider.ApiKey}" } },
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
+
+        if (provider.Headers is not null)
+        {
+            foreach (var (name, value) in provider.Headers)
+            {
+                request.Headers.TryAddWithoutValidation(name, value);
+            }
+        }
 
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
@@ -140,4 +195,11 @@ public class OpenAiService
 
         return true;
     }
+
+    private sealed record ChatCompletionProvider(
+        string Name,
+        string EndpointUrl,
+        string ApiKey,
+        string[] Models,
+        Dictionary<string, string>? Headers);
 }
