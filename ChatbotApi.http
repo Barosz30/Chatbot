@@ -6,7 +6,11 @@ GET {{ChatbotApi_HostAddress}}/api/chat/ping
 ###
 
 # Static welcome message for the chat UI (no OpenRouter call).
-GET {{ChatbotApi_HostAddress}}/api/chat/welcome
+GET {{ChatbotApi_HostAddress}}/api/chat/welcome?lang=pl
+
+###
+
+GET {{ChatbotApi_HostAddress}}/api/chat/welcome?lang=en
 
 ###
 
