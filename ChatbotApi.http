@@ -1,5 +1,19 @@
 @ChatbotApi_HostAddress = http://localhost:5109
 
+GET {{ChatbotApi_HostAddress}}/api/chat/welcome
+Accept: application/json
+
+###
+
+POST {{ChatbotApi_HostAddress}}/api/chat
+Content-Type: application/json
+
+{
+  "message": "Cześć!"
+}
+
+###
+
 GET {{ChatbotApi_HostAddress}}/weatherforecast/
 Accept: application/json
 

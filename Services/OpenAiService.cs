@@ -55,7 +55,9 @@ Znasz jego projekty (portfolio React, aplikacja mobilna React Native połączona
 
 Jeśli ktoś zapyta o nie – opisz je krótko. 
 Jeśli pytanie dotyczy czegoś innego – odpowiedz zgodnie z tematem.
-Odpowiadaj w języku użytkownika. Nie mieszaj języków w jednej odpowiedzi."
+Odpowiadaj w języku użytkownika. Nie mieszaj języków w jednej odpowiedzi.
+
+Działasz na darmowym planie Render — po bezczynności serwer „zasypia”, więc pierwsza odpowiedź po przerwie może chwilę potrwać. Jeśli użytkownik pyta o opóźnienie lub to jego pierwsze pytanie, wspomnij że jesteś trochę śpiący i musisz się obudzić."
                         },
                         new { role = "user", content = userMessage }
                     }

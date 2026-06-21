@@ -16,6 +16,13 @@ public class ChatController : ControllerBase
         _openAi = openAi;
     }
 
+    [HttpGet("welcome")]
+    [DisableRateLimiting]
+    public IActionResult GetWelcome()
+    {
+        return Ok(new { message = ChatWelcome.Message });
+    }
+
     [HttpPost]
     public async Task<IActionResult> Post([FromBody] ChatRequest request)
     {
